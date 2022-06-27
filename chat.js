@@ -50,12 +50,12 @@ async function run(context) {
   });
   const page = await browser.newPage();
   
-  await page.goto('https://www.youtube.com/watch?v=vPRda_0f9To');
+  await page.goto('https://www.youtube.com/watch?v=M2abw-eh_JI');
   await page.waitForSelector('[aria-label="Accept the use of cookies and other data for the purposes described"]');
   await page.click('[aria-label="Accept the use of cookies and other data for the purposes described"]');
 
   await page.waitForTimeout(3000);
-  
+
   const elementHandle = await page.waitForSelector('#chat iframe');
   const frame = await elementHandle.contentFrame();
   const context = await frame.executionContext();

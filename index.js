@@ -3,6 +3,8 @@ const fs = require('fs');
 
 const { readTrades } = require('./readTrades');
 
+const url = "https://youtu.be/vPRda_0f9To?t=1706";
+//'https://www.youtube.com/watch?v=1K9zLQHKvi0'
 const tempImg = `${__dirname}/temp/img.jpg`;
 
 const trades = {
@@ -75,7 +77,7 @@ async function run(page) {
     setTrades(longs, shorts);
   }
 
-  setTimeout(() => run(page), 0);
+  setTimeout(() => run(page), 500);
 }
 
 (async () => {
@@ -86,11 +88,12 @@ async function run(page) {
       '--window-size=1920,1080',
     ],
     defaultViewport: null,
-    headless: true
+    executablePath: '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome',
+    headless: true, 
   });
+
   const page = await browser.newPage();
-  
-  await page.goto('https://www.youtube.com/watch?v=1K9zLQHKvi0');
+  await page.goto(url);
   await page.waitForSelector('[aria-label="Accept the use of cookies and other data for the purposes described"]');
   await page.click('[aria-label="Accept the use of cookies and other data for the purposes described"]');
 

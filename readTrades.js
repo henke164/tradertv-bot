@@ -2,20 +2,82 @@ const Jimp = require('jimp');
 const { recognize } = require("node-native-ocr");
 const fs = require("fs");
 
-let topLeftStr = "";
-let topRightStr = "";
-let bottomLeftStr = "";
-let bottomRightStr = "";
+let trades = {
+  longs1: {},
+  longs2: {},
+  shorts1: {},
+  shorts2: {},
+};
+
+function removeUnseen(trade) {
+  if (Object.keys(trade).length === 0) {
+    return;
+  }
+
+  let oldestUpdate;
+  let newestUpdate;
+  for (let i = 0; i < Object.keys(trade).length; i++) {
+    const key = Object.keys(trade)[i];
+    const updateTime = trade[key];
+
+    if (!oldestUpdate || oldestUpdate.time > updateTime) {
+      oldestUpdate = {
+        key,
+        time: updateTime,
+      }
+    }
+    if (!newestUpdate || newestUpdate.time < updateTime) {
+      newestUpdate = {
+        key,
+        time: updateTime,
+      }
+    }
+  }
+
+  const diff = newestUpdate.time - oldestUpdate.time;
+  if (diff > 60000) {
+    delete trade[oldestUpdate.key];
+  }
+}
+
+function getTrades(txt, isMarquee) {
+  const marqueeregex = /\| ([A-Z]{3,6}) \d*\.\d* |/g;
+  const defaultregex = /([A-Z]{3,6}) \d*\.\d* |/g;
+  const regex = isMarquee ? marqueeregex : defaultregex;
+
+  const matches = txt.match(regex);
+  if (!matches) {
+    return [];
+  }
+
+  return matches.map(
+    m => m.replace(/\|/g, '')
+    .replace(/\d*\.\d*/, '')
+    .trim()
+  ).filter(m => m !== '');
+}
+
+async function isMarquee(c) {
+  for (let i = 0; i < 32; i++) {
+    const color = await c.getPixelColor(i, 25);
+    if (color < 1000000000) {
+      return false;
+    }
+  }
+  return true;
+}
 
 function cropImage(tempImg, x, y, w, h, name) {
   return new Promise(resolve => {
-    Jimp.read(tempImg, (err, image) => {
-      image
+    Jimp.read(tempImg, async (err, image) => {
+      const c = await image
         .crop(x, y, w, h)
         .invert()
         .grayscale()
         .quality(60)
-        .write(name, resolve);
+        .write(name);
+
+      resolve(c);
     });
   });
 }
@@ -26,51 +88,52 @@ async function readTrades(tempImg) {
   const bottomLeftImage = 'temp/bottom_left.jpg';
   const bottomRightImage = 'temp/bottom_right.jpg';
 
-  await cropImage(tempImg, 800, 1385, 740, 50, topLeftImage);
-  await cropImage(tempImg, 1845, 1385, 710, 50, topRightImage);
-  await cropImage(tempImg, 800, 1385 + 50, 740, 50, bottomLeftImage);
-  await cropImage(tempImg, 1845, 1385 + 50, 710, 50, bottomRightImage);
+  const tlCroppedImage = await cropImage(tempImg, 800, 1385, 740, 50, topLeftImage);
+  const trCroppedImage = await cropImage(tempImg, 1845, 1385, 710, 50, topRightImage);
+  const blCroppedImage = await cropImage(tempImg, 800, 1385 + 50, 740, 50, bottomLeftImage);
+  const brCroppedImage = await cropImage(tempImg, 1845, 1385 + 50, 710, 50, bottomRightImage);
 
-  const leftBuffer = fs.readFileSync(`${__dirname}/${topLeftImage}`);
-  const resLeft = await recognize(leftBuffer, {
-    output: null
-  });
+  const tlMarquee = await isMarquee(tlCroppedImage);
+  const trMarquee = await isMarquee(trCroppedImage);
+  const blMarquee = await isMarquee(blCroppedImage);
+  const brMarquee = await isMarquee(brCroppedImage);
 
-  const rightBuffer = fs.readFileSync(`${__dirname}/${topRightImage}`);
-  const resRight = await recognize(rightBuffer, {
-    output: null
-  });
-
-  let longs = [];
-  let shorts = [];
+  const tlTxt = await recognize(fs.readFileSync(`${__dirname}/${topLeftImage}`));
+  const trTxt = await recognize(fs.readFileSync(`${__dirname}/${topRightImage}`));
+  const blTxt = await recognize(fs.readFileSync(`${__dirname}/${bottomLeftImage}`));
+  const brTxt = await recognize(fs.readFileSync(`${__dirname}/${bottomRightImage}`));
   
-  if (!resLeft.includes('|') && !resRight.includes('|')) {
-    if (!resLeft.includes('no positions') || !resRight.includes('no positions')) {
-      return null;
-    }
+  const longs1 = getTrades(tlTxt, tlMarquee);
+  longs1.forEach(long => {
+    trades.longs1[long] = Date.now();
+  });
 
-    return {
-      longs,
-      shorts
-    }
-  }
+  const longs2 = getTrades(trTxt, trMarquee);
+  longs2.forEach(long => {
+    trades.longs2[long] = Date.now();
+  });
 
-  const leftArr = resLeft.split('\n');
-  const rightArr = resRight.split('\n');
+  const shorts1 = getTrades(blTxt, blMarquee);
+  shorts1.forEach(short => {
+    trades.shorts1[short] = Date.now();
+  });
 
-  if (leftArr.length < 2 || rightArr.length < 2) {
-    return {
-      longs,
-      shorts,
-    }
-  }
+  const shorts2 = getTrades(brTxt, brMarquee);
+  shorts2.forEach(short => {
+    trades.shorts2[short] = Date.now();
+  });
 
-  longs = [...leftArr[0].split('|'), ...rightArr[0].split('|')];
-  shorts = [...leftArr[1].split('|'), ...rightArr[1].split('|')];
+  removeUnseen(trades.longs1);
+  removeUnseen(trades.longs2);
+  removeUnseen(trades.shorts1);
+  removeUnseen(trades.shorts2);
 
+  // Remove no positions
+
+  console.log(trades);
   return {
-    longs: longs.map(l => l.trim()).filter(l => !!l && l.toLowerCase() !== 'no positions'),
-    shorts: shorts.map(s => s.trim()).filter(s => !!s && s.toLowerCase() !== 'no positions'),
+    longs: [],
+    shorts: [],
   };
 }
 
