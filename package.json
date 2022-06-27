@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "jimp": "^0.16.1",
+    "node-native-ocr": "^0.2.0",
+    "puppeteer": "^15.1.1",
+    "shelljs": "^0.8.5"
+  }
+}
