@@ -34,7 +34,7 @@ function removeUnseen(trade, isMarquee) {
     }
   }
 
-  const maxDiffTime = isMarquee ? 120000 : 1000;
+  const maxDiffTime = isMarquee ? 120000 : 5000;
   const diff = newestUpdate.time - oldestUpdate.time;
   if (diff > maxDiffTime) {
     delete trade[oldestUpdate.key];

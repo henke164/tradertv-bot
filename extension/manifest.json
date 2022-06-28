@@ -1,0 +1,28 @@
+{
+  "name": "IG Trade bot",
+  "description": "IG Trade bot",
+  "version": "1.0",
+  "manifest_version": 3,
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "scripting",
+    "tabs",
+    "*://*/*"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "web_accessible_resources": [{
+    "resources": [
+      "botScript.js"
+    ],
+    "matches": ["<all_urls>"]
+  }]
+}

@@ -84,8 +84,6 @@ function handleTrades(longs, shorts, onNewTradesFound) {
       sells
     });
   }
-  
-  fs.writeFileSync('./trades.json', JSON.stringify(trades));
 }
 
 async function run(page, onNewTradesFound) {
