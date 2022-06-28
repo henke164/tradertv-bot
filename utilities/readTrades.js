@@ -9,7 +9,7 @@ let trades = {
   shorts2: {},
 };
 
-function removeUnseen(trade) {
+function removeUnseen(trade, isMarquee) {
   if (Object.keys(trade).length === 0) {
     return;
   }
@@ -34,8 +34,9 @@ function removeUnseen(trade) {
     }
   }
 
+  const maxDiffTime = isMarquee ? 120000 : 1000;
   const diff = newestUpdate.time - oldestUpdate.time;
-  if (diff > 60000) {
+  if (diff > maxDiffTime) {
     delete trade[oldestUpdate.key];
   }
 }
@@ -67,9 +68,9 @@ async function isMarquee(c) {
   return true;
 }
 
-function cropImage(tempImg, x, y, w, h, name) {
+function cropImage(screenshot, x, y, w, h, name) {
   return new Promise(resolve => {
-    Jimp.read(tempImg, async (err, image) => {
+    Jimp.read(screenshot, async (err, image) => {
       const c = await image
         .crop(x, y, w, h)
         .invert()
@@ -82,26 +83,26 @@ function cropImage(tempImg, x, y, w, h, name) {
   });
 }
 
-async function readTrades(tempImg) {
-  const topLeftImage = 'temp/top_left.jpg';
-  const topRightImage = 'temp/top_right.jpg';
-  const bottomLeftImage = 'temp/bottom_left.jpg';
-  const bottomRightImage = 'temp/bottom_right.jpg';
-
-  const tlCroppedImage = await cropImage(tempImg, 800, 1385, 740, 50, topLeftImage);
-  const trCroppedImage = await cropImage(tempImg, 1845, 1385, 710, 50, topRightImage);
-  const blCroppedImage = await cropImage(tempImg, 800, 1385 + 50, 740, 50, bottomLeftImage);
-  const brCroppedImage = await cropImage(tempImg, 1845, 1385 + 50, 710, 50, bottomRightImage);
+async function readTrades(tempFolder) {
+  const topLeftImage = `${tempFolder}/top_left.jpg`;
+  const topRightImage = `${tempFolder}/top_right.jpg`;
+  const bottomLeftImage = `${tempFolder}/bottom_left.jpg`;
+  const bottomRightImage = `${tempFolder}/bottom_right.jpg`;
+  const screenshot = `${tempFolder}/screenshot.jpg`;
+  const tlCroppedImage = await cropImage(screenshot, 800, 1385, 740, 50, topLeftImage);
+  const trCroppedImage = await cropImage(screenshot, 1845, 1385, 710, 50, topRightImage);
+  const blCroppedImage = await cropImage(screenshot, 800, 1385 + 50, 740, 50, bottomLeftImage);
+  const brCroppedImage = await cropImage(screenshot, 1845, 1385 + 50, 710, 50, bottomRightImage);
 
   const tlMarquee = await isMarquee(tlCroppedImage);
   const trMarquee = await isMarquee(trCroppedImage);
   const blMarquee = await isMarquee(blCroppedImage);
   const brMarquee = await isMarquee(brCroppedImage);
 
-  const tlTxt = await recognize(fs.readFileSync(`${__dirname}/${topLeftImage}`));
-  const trTxt = await recognize(fs.readFileSync(`${__dirname}/${topRightImage}`));
-  const blTxt = await recognize(fs.readFileSync(`${__dirname}/${bottomLeftImage}`));
-  const brTxt = await recognize(fs.readFileSync(`${__dirname}/${bottomRightImage}`));
+  const tlTxt = await recognize(fs.readFileSync(topLeftImage));
+  const trTxt = await recognize(fs.readFileSync(topRightImage));
+  const blTxt = await recognize(fs.readFileSync(bottomLeftImage));
+  const brTxt = await recognize(fs.readFileSync(bottomRightImage));
   
   const longs1 = getTrades(tlTxt, tlMarquee);
   longs1.forEach(long => {
@@ -123,17 +124,37 @@ async function readTrades(tempImg) {
     trades.shorts2[short] = Date.now();
   });
 
-  removeUnseen(trades.longs1);
-  removeUnseen(trades.longs2);
-  removeUnseen(trades.shorts1);
-  removeUnseen(trades.shorts2);
+  removeUnseen(trades.longs1, tlMarquee);
+  removeUnseen(trades.longs2, trMarquee);
+  removeUnseen(trades.shorts1, blMarquee);
+  removeUnseen(trades.shorts2, brMarquee);
 
-  // Remove no positions
+  if (tlTxt === 'no positions') {
+    trades.longs1 = {};
+  }
+
+  if (trTxt === 'no positions') {
+    trades.longs2 = {};
+  }
+
+  if (blTxt === 'no positions') {
+    trades.shorts1 = {};
+  }
+
+  if (brTxt === 'no positions') {
+    trades.shorts2 = {};
+  }
 
   console.log(trades);
   return {
-    longs: [],
-    shorts: [],
+    longs: [
+      ...Object.keys(trades.longs1),
+      ...Object.keys(trades.longs2),
+    ],
+    shorts: [
+      ...Object.keys(trades.shorts1),
+      ...Object.keys(trades.shorts2)
+    ],
   };
 }
 

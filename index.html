@@ -1,0 +1,13 @@
+<html>
+<head>
+<script type="module">
+  import { io } from "https://cdn.socket.io/4.4.1/socket.io.esm.min.js";
+  const socket = io("ws://localhost:3000");
+  socket.on("message", (msg) => {
+    const { buys, sells } = JSON.parse(msg);
+    console.log("buys", buys);
+    console.log("sells", sells);
+  });
+</script>
+</head>
+</html>
